@@ -1,0 +1,262 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  fullName      String    @map("full_name")
+  role          String    @default("user")
+  department    String?
+  phone         String?
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  permits       Permit[]  @relation("CreatedBy")
+  engineeringApprovals Permit[] @relation("EngineeringApprover")
+
+  @@map("users")
+}
+
+model Permit {
+  id             String   @id @default(uuid())
+
+  // ✅ PTW-2026-00001 formatı
+  permitNumber   String   @unique @map("permit_number")
+
+  ptwType        String   @map("ptw_type")
+  ptwSubType     String?  @map("ptw_sub_type") // e.g., "prescribed" for Electrical
+  riskLevel      String   @map("risk_level")
+  status         String   @default("draft")
+
+  locationName   String   @map("location_name")
+  contractorName String   @map("contractor_name")
+
+  description    String
+
+  validFrom      DateTime @map("valid_from")
+  validUntil     DateTime @map("valid_until")
+
+  // Crane Permit Specifics
+  engineeringApprovedById String?   @map("engineering_approved_by_id")
+  engineeringApprovedBy   User?     @relation("EngineeringApprover", fields: [engineeringApprovedById], references: [id])
+  engineeringApprovedAt   DateTime? @map("engineering_approved_at")
+
+  qrCodeUrl      String?  @map("qr_code_url")
+  qrCodeData     String?  @map("qr_code_data")
+
+  // Record Retention / Archiving
+  isArchived     Boolean   @default(false) @map("is_archived")
+  archiveUntil   DateTime? @map("archive_until")
+
+  createdById    String   @map("created_by_id")
+  createdBy      User     @relation("CreatedBy", fields: [createdById], references: [id])
+
+  // Strict Workflow Enforcement Fields
+  hazardsIdentified      Boolean   @default(false) @map("hazards_identified")
+  controlsRequired       Boolean   @default(false) @map("controls_required")
+  ppeIdentified          Boolean   @default(false) @map("ppe_identified")
+  equipmentIdentified    Boolean   @default(false) @map("equipment_identified")
+  
+  // Concurrent & Affected Dept Approvals
+  affectedDeptApproved   Boolean   @default(false) @map("affected_dept_approved")
+  affectedDeptApprovedBy String?   @map("affected_dept_approved_by")
+  affectedDeptApprovedAt DateTime? @map("affected_dept_approved_at")
+
+  // Closure Request
+  closureRequested       Boolean   @default(false) @map("closure_requested")
+  closureRequestedBy     String?   @map("closure_requested_by")
+  closureRequestedAt     DateTime? @map("closure_requested_at")
+
+  // Safiport Form Specifics
+  workEntity             String?   @map("work_entity") // SAFI, SUB, MAIN, etc.
+  temperature            String?
+  humidity               String?
+  personnelList          String?   @map("personnel_list") // JSON List of {name, company}
+  workTypes              String?   @map("work_types") // JSON List of selected work types
+  
+  // Detailed Checklist JSONs (Replacing simple booleans if needed, or augmenting)
+  selectedHazards        String?   @map("selected_hazards") // JSON
+  selectedPrecautions    String?   @map("selected_precautions") // JSON
+  selectedPPE            String?   @map("selected_ppe") // JSON
+  
+  // Custom "Other" inputs
+  otherHazards           String?   @map("other_hazards")
+  otherPrecautions       String?   @map("other_precautions")
+  otherPPE               String?   @map("other_ppe")
+  siteTestRequired       Boolean   @default(false) @map("site_test_required")
+  requiredCertificates   String?   @map("required_certificates") // JSON
+
+  // Relations for advanced features
+  documents       Document[]
+  signatures      Signature[]
+  auditLogs       AuditLog[]
+  handovers       PermitHandover[]
+  dailyChecklists DailyChecklist[]
+  gasTestRecords  GasTestRecord[]
+  certificateRecords CertificateRecord[]
+
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("permits")
+  @@index([status])
+  @@index([validFrom, validUntil])
+}
+
+model PermitHandover {
+  id                   String   @id @default(uuid())
+  permitId             String   @map("permit_id")
+  permit               Permit   @relation(fields: [permitId], references: [id], onDelete: Cascade)
+
+  outgoingIssuerName   String   @map("outgoing_issuer_name")
+  incomingIssuerName   String   @map("incoming_issuer_name")
+  handoverDate         DateTime @default(now()) @map("handover_date")
+  notes                String?
+
+  outgoingSignatureUrl String?  @map("outgoing_signature_url")
+  incomingSignatureUrl String?  @map("incoming_signature_url")
+
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  @@map("permit_handovers")
+}
+
+model GasTestRecord {
+  id            String   @id @default(uuid())
+  permitId      String   @map("permit_id")
+  permit        Permit   @relation(fields: [permitId], references: [id], onDelete: Cascade)
+
+  testTime      String   @map("test_time") // "08:00"
+  oxygen        String?  // %
+  co2           String?  // ppm
+  lel           String?  // %
+  toxic         String?  // ppm
+  co            String?  // ppm
+  
+  testedBy      String?  @map("tested_by")
+
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("gas_test_records")
+}
+
+model CertificateRecord {
+  id              String   @id @default(uuid())
+  permitId        String   @map("permit_id")
+  permit          Permit   @relation(fields: [permitId], references: [id], onDelete: Cascade)
+
+  certificateType String   @map("certificate_type") // "Kazı Sertifikası", "Gaz Ölçüm Sertifikası", etc.
+  certificateNo   String?  @map("certificate_no")
+  holderName      String   @map("holder_name")
+  issueDate       DateTime @map("issue_date")
+  expiryDate      DateTime? @map("expiry_date")
+  issuingAuthority String?  @map("issuing_authority")
+  documentUrl     String?  @map("document_url")
+  notes           String?
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("certificate_records")
+}
+
+model DailyChecklist {
+  id            String   @id @default(uuid())
+  permitId      String   @map("permit_id")
+  permit        Permit   @relation(fields: [permitId], references: [id], onDelete: Cascade)
+
+  checkDate     DateTime @default(now()) @map("check_date")
+  checkedByName String   @map("checked_by_name")
+  isSafe        Boolean  @default(true) @map("is_safe")
+  comments      String?
+
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("daily_checklists")
+}
+
+model Document {
+  id        String   @id @default(uuid())
+  name      String
+  url       String
+  type      String   // e.g., "risk_assessment", "method_statement"
+  permitId  String   @map("permit_id")
+  permit    Permit   @relation(fields: [permitId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("documents")
+}
+
+model Signature {
+  id           String   @id @default(uuid())
+  role         String   // "requester", "approver", "issuer"
+  signerName   String   @map("signer_name")
+  signatureUrl String   @map("signature_url")
+  permitId     String   @map("permit_id")
+  permit       Permit   @relation(fields: [permitId], references: [id])
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("signatures")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?  @map("user_id")
+  action     String   // e.g., "CREATE_PERMIT", "APPROVE_PERMIT"
+  entityType String   @map("entity_type") // e.g., "Permit"
+  entityId   String   @map("entity_id")
+  details    String?  // JSON string for before/after state
+  ipAddress  String?  @map("ip_address")
+  permitId   String?  @map("permit_id")
+  permit     Permit?  @relation(fields: [permitId], references: [id])
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("audit_logs")
+}
+
+model PermitCounter {
+  year      Int      @id
+  lastNo    Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@map("permit_counters")
+}
+
+model Contractor {
+  id                   String   @id @default(uuid())
+  name                 String
+  company              String
+  contactPerson        String   @map("contact_person")
+  email                String   @unique
+  phone                String
+  certificationNumber  String?  @map("certification_number")
+  certificationExpiry  DateTime? @map("certification_expiry")
+  isActive             Boolean  @default(true) @map("is_active")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("contractors")
+}
+
+model Location {
+  id          String   @id @default(uuid())
+  name        String
+  building    String
+  floor       String
+  zone        String
+  description String?
+  riskLevel   String   @map("risk_level")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("locations")
+}
+
