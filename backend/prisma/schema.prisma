@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  fullName      String    @map("full_name")
+  role          String    @default("user")
+  department    String?
+  phone         String?
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  permits       Permit[]  @relation("CreatedBy")
+
+  @@map("users")
+}
+
+model Permit {
+  id             String   @id @default(uuid())
+  permitNumber   String   @unique @map("permit_number")
+  ptwType        String   @map("ptw_type")
+  riskLevel      String   @map("risk_level")
+  status         String   @default("draft")
+  locationName   String   @map("location_name")
+  contractorName String   @map("contractor_name")
+  description    String   @db.Text
+  validFrom      DateTime @map("valid_from")
+  validUntil     DateTime @map("valid_until")
+  qrCodeUrl      String?  @map("qr_code_url")
+  qrCodeData     String?  @map("qr_code_data")
+  
+  createdById    String   @map("created_by_id")
+  createdBy      User     @relation("CreatedBy", fields: [createdById], references: [id])
+  
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("permits")
+  @@index([status])
+  @@index([validFrom, validUntil])
+}

@@ -1,0 +1,20 @@
+{
+  "name": "ptw-tracker",
+  "version": "1.0.0",
+  "description": "PTW Tracker System",
+  "private": true,
+  "scripts": {
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "install:backend": "cd backend && npm install",
+    "install:frontend": "cd frontend && npm install",
+    "install:all": "npm run install:backend && npm run install:frontend"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/future01software/ptw-tracker.git"
+  },
+  "keywords": ["ptw", "permit", "safety"],
+  "author": "Future01 Software",
+  "license": "MIT"
+}
