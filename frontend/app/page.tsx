@@ -1,14 +1,14 @@
-export default async function Home() {
-  const res = await fetch("http://localhost:3001/api/v1/permits", {
-    cache: "no-store",
-  });
+'use client';
 
-  const text = await res.text();
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-  return (
-    <main style={{ padding: 24 }}>
-      <h1>PTW Tracker</h1>
-      <pre style={{ marginTop: 16, whiteSpace: "pre-wrap" }}>{text}</pre>
-    </main>
-  );
+export default function Home() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.push('/dashboard');
+  }, [router]);
+
+  return null;
 }

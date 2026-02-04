@@ -26,21 +26,28 @@ model User {
 
 model Permit {
   id             String   @id @default(uuid())
+
+  // ✅ PTW-2026-00001 formatı
   permitNumber   String   @unique @map("permit_number")
+
   ptwType        String   @map("ptw_type")
   riskLevel      String   @map("risk_level")
   status         String   @default("draft")
+
   locationName   String   @map("location_name")
   contractorName String   @map("contractor_name")
+
   description    String   @db.Text
+
   validFrom      DateTime @map("valid_from")
   validUntil     DateTime @map("valid_until")
+
   qrCodeUrl      String?  @map("qr_code_url")
   qrCodeData     String?  @map("qr_code_data")
-  
+
   createdById    String   @map("created_by_id")
   createdBy      User     @relation("CreatedBy", fields: [createdById], references: [id])
-  
+
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -48,3 +55,12 @@ model Permit {
   @@index([status])
   @@index([validFrom, validUntil])
 }
+
+model PermitCounter {
+  year      Int      @id
+  lastNo    Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@map("permit_counters")
+}
+
