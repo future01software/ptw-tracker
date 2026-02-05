@@ -6,10 +6,13 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/a
 async function apiFetch(endpoint: string, options?: RequestInit) {
     const url = `${API_BASE_URL}${endpoint}`;
 
+    const token = typeof window !== 'undefined' ? localStorage.getItem('ptw_token') : null;
+
     const response = await fetch(url, {
         ...options,
         headers: {
             'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
             ...options?.headers,
         },
     });
@@ -147,6 +150,20 @@ export const permitsApi = {
         return apiFetch(`/permits/${permitId}/certificates`, {
             method: 'POST',
             body: JSON.stringify(data),
+        });
+    },
+    // Approve Permit (Final/Approver)
+    approve: async (id: string) => {
+        return apiFetch(`/permits/${id}/approve`, {
+            method: 'POST',
+        });
+    },
+
+    // Reject Permit with reason
+    reject: async (id: string, reason: string) => {
+        return apiFetch(`/permits/${id}/reject`, {
+            method: 'POST',
+            body: JSON.stringify({ reason }),
         });
     },
 };
@@ -311,6 +328,48 @@ export const analyticsApi = {
 // ==================== USERS API ====================
 
 export const usersApi = {
+    // Login
+    login: async (credentials: { email: string; password: string }) => {
+        const response = await apiFetch('/auth/login', {
+            method: 'POST',
+            body: JSON.stringify(credentials),
+        });
+
+        if (response.success && response.token) {
+            localStorage.setItem('ptw_token', response.token);
+            localStorage.setItem('ptw_user', JSON.stringify(response.data.user));
+        }
+
+        return response;
+    },
+
+    // Logout
+    logout: () => {
+        localStorage.removeItem('ptw_token');
+        localStorage.removeItem('ptw_user');
+        window.location.href = '/login';
+    },
+
+    // Get all users (Admin)
+    getAll: async () => {
+        return apiFetch('/users');
+    },
+
+    // Update user role/profile
+    update: async (id: string, data: { role?: string, fullName?: string, isActive?: boolean }) => {
+        return apiFetch(`/users/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    },
+
+    // Get current user from storage
+    getCurrentUser: () => {
+        if (typeof window === 'undefined') return null;
+        const user = localStorage.getItem('ptw_user');
+        return user ? JSON.parse(user) : null;
+    },
+
     // Seed a user (dev only)
     seedUser: async (data?: {
         email?: string;

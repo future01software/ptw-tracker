@@ -1,8 +1,12 @@
+"use client";
+
 import { useLanguage } from '@/lib/LanguageContext';
-import { User, Globe } from 'lucide-react';
+import { User, Globe, LogOut } from 'lucide-react';
+import { usersApi } from '@/lib/api';
 
 export function Header() {
     const { t, language, setLanguage } = useLanguage();
+    const user = usersApi.getCurrentUser();
 
     return (
         <div className="flex items-center gap-6">
@@ -21,12 +25,20 @@ export function Header() {
             {/* User Profile */}
             <div className="flex items-center gap-3 pl-2">
                 <div className="text-right hidden md:block">
-                    <p className="text-sm font-black text-slate-900 leading-none mb-1">{t.header.role}</p>
-                    <p className="text-xs font-bold text-slate-400">{t.header.profile}</p>
+                    <p className="text-sm font-black text-slate-900 leading-none mb-1">{user?.fullName || t.header.role}</p>
+                    <p className="text-xs font-bold text-slate-400 capitalize">{user?.role || t.header.profile}</p>
                 </div>
                 <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-slate-200 shadow-sm text-slate-600">
                     <User className="w-5 h-5" />
                 </div>
+
+                <button
+                    onClick={() => usersApi.logout()}
+                    className="ml-2 p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                    title="Logout"
+                >
+                    <LogOut className="w-5 h-5" />
+                </button>
             </div>
         </div>
     );

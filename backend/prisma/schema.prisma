@@ -94,6 +94,9 @@ model Permit {
   siteTestRequired       Boolean   @default(false) @map("site_test_required")
   requiredCertificates   String?   @map("required_certificates") // JSON
 
+  // Rejection logic
+  rejectionReason        String?   @map("rejection_reason")
+
   // Relations for advanced features
   documents       Document[]
   signatures      Signature[]
@@ -247,7 +250,7 @@ model Contractor {
 
 model Location {
   id          String   @id @default(uuid())
-  name        String
+  name        String   @unique
   building    String
   floor       String
   zone        String

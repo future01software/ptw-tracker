@@ -18,6 +18,8 @@ export const metadata: Metadata = {
   description: "Kapsamlı iş izin takip ve yönetim sistemi",
 };
 
+import { Toaster } from "sonner";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -30,6 +32,7 @@ export default function RootLayout({
       >
         <LanguageProvider>
           {children}
+          <Toaster position="top-right" richColors />
         </LanguageProvider>
       </body>
     </html>

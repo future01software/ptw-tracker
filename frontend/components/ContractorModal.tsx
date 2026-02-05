@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,11 +12,13 @@ interface ContractorModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    initialData?: any;
 }
 
-export function ContractorModal({ isOpen, onClose, onSuccess }: ContractorModalProps) {
-    const { t } = useLanguage();
+export function ContractorModal({ isOpen, onClose, onSuccess, initialData }: ContractorModalProps) {
+    const { t, language } = useLanguage();
     const [loading, setLoading] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         company: '',
@@ -24,6 +26,30 @@ export function ContractorModal({ isOpen, onClose, onSuccess }: ContractorModalP
         email: '',
         phone: ''
     });
+
+    useEffect(() => {
+        if (isOpen) {
+            if (initialData) {
+                setFormData({
+                    name: initialData.name || '',
+                    company: initialData.company || '',
+                    contactPerson: initialData.contactPerson || '',
+                    email: initialData.email || '',
+                    phone: initialData.phone || ''
+                });
+                setIsEditing(true);
+            } else {
+                setFormData({
+                    name: '',
+                    company: '',
+                    contactPerson: '',
+                    email: '',
+                    phone: ''
+                });
+                setIsEditing(false);
+            }
+        }
+    }, [isOpen, initialData]);
 
     const handleSubmit = async () => {
         if (!formData.name || !formData.company) {
@@ -33,19 +59,17 @@ export function ContractorModal({ isOpen, onClose, onSuccess }: ContractorModalP
 
         try {
             setLoading(true);
-            await contractorsApi.create(formData);
-            toast.success(t.contractors.successMessage);
+            if (isEditing && initialData?.id) {
+                await contractorsApi.update(initialData.id, formData);
+                toast.success(language === 'tr' ? 'Müteahhit güncellendi' : 'Contractor updated');
+            } else {
+                await contractorsApi.create(formData);
+                toast.success(t.contractors.successMessage);
+            }
             onSuccess();
             onClose();
-            setFormData({
-                name: '',
-                company: '',
-                contactPerson: '',
-                email: '',
-                phone: ''
-            });
         } catch (err: any) {
-            toast.error('Failed to create contractor');
+            toast.error(isEditing ? 'Failed to update contractor' : 'Failed to create contractor');
         } finally {
             setLoading(false);
         }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,11 +14,13 @@ interface LocationModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    initialData?: any;
 }
 
-export function LocationModal({ isOpen, onClose, onSuccess }: LocationModalProps) {
-    const { t } = useLanguage();
+export function LocationModal({ isOpen, onClose, onSuccess, initialData }: LocationModalProps) {
+    const { t, language } = useLanguage();
     const [loading, setLoading] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         building: '',
@@ -28,6 +30,32 @@ export function LocationModal({ isOpen, onClose, onSuccess }: LocationModalProps
         riskLevel: 'Low'
     });
 
+    useEffect(() => {
+        if (isOpen) {
+            if (initialData) {
+                setFormData({
+                    name: initialData.name || '',
+                    building: initialData.building || '',
+                    floor: initialData.floor || '',
+                    zone: initialData.zone || '',
+                    description: initialData.description || '',
+                    riskLevel: initialData.riskLevel || 'Low'
+                });
+                setIsEditing(true);
+            } else {
+                setFormData({
+                    name: '',
+                    building: '',
+                    floor: '',
+                    zone: '',
+                    description: '',
+                    riskLevel: 'Low'
+                });
+                setIsEditing(false);
+            }
+        }
+    }, [isOpen, initialData]);
+
     const handleSubmit = async () => {
         if (!formData.name || !formData.riskLevel) {
             toast.error('Name and Risk Level are required');
@@ -36,20 +64,17 @@ export function LocationModal({ isOpen, onClose, onSuccess }: LocationModalProps
 
         try {
             setLoading(true);
-            await locationsApi.create(formData);
-            toast.success(t.locations.successMessage);
+            if (isEditing && initialData?.id) {
+                await locationsApi.update(initialData.id, formData);
+                toast.success(language === 'tr' ? 'Lokasyon güncellendi' : 'Location updated');
+            } else {
+                await locationsApi.create(formData);
+                toast.success(t.locations.successMessage);
+            }
             onSuccess();
             onClose();
-            setFormData({
-                name: '',
-                building: '',
-                floor: '',
-                zone: '',
-                description: '',
-                riskLevel: 'Low'
-            });
         } catch (err: any) {
-            toast.error('Failed to create location');
+            toast.error(isEditing ? 'Failed to update location' : 'Failed to create location');
         } finally {
             setLoading(false);
         }

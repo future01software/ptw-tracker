@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { permitsApi } from '@/lib/api';
+import { permitsApi, usersApi } from '@/lib/api';
 import { useLanguage } from '@/lib/LanguageContext';
 import { Header } from '@/components/Header';
 import { socket } from '@/lib/socket';
@@ -29,6 +29,7 @@ import { NotificationSystem, clearOldNotifications } from '@/components/Notifica
 import { KanbanBoard } from '@/components/KanbanBoard';
 import { ExportMenu } from '@/components/ExportMenu';
 import { LayoutGrid, List } from 'lucide-react';
+import { AuthGuard } from '@/components/auth/AuthGuard';
 
 export default function DashboardPage() {
     const { t, language } = useLanguage();
@@ -36,6 +37,7 @@ export default function DashboardPage() {
     const [permits, setPermits] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [currentUser, setCurrentUser] = useState<any>(null);
 
     const [activeTab, setActiveTab] = useState('all');
     const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
@@ -47,6 +49,8 @@ export default function DashboardPage() {
     });
 
     useEffect(() => {
+        const user = usersApi.getCurrentUser();
+        setCurrentUser(user);
         fetchDashboardData();
         clearOldNotifications();
 
@@ -146,7 +150,7 @@ export default function DashboardPage() {
 
     const counts = useMemo(() => ({
         all: permits.length,
-        pending: permits.filter(p => p.status.toLowerCase() === 'pending').length,
+        approvals: permits.filter(p => p.status.toLowerCase() === 'pending').length,
         active: permits.filter(p => p.status.toLowerCase() === 'active').length,
         completed: permits.filter(p => p.status.toLowerCase() === 'completed').length,
     }), [permits]);
@@ -163,217 +167,256 @@ export default function DashboardPage() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 flex">
-            <Toaster position="top-right" richColors />
-            <NotificationSystem permits={permits} />
+        <AuthGuard>
+            <div className="min-h-screen bg-slate-50 flex">
+                <Toaster position="top-right" richColors />
+                <NotificationSystem permits={permits} />
 
-            {/* Sidebar (Desktop) */}
-            <aside className="hidden lg:flex w-72 bg-white border-r border-slate-200 flex-col sticky top-0 h-screen">
-                <div className="p-8 pb-4 flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
-                        <FileText className="w-6 h-6" />
-                    </div>
-                    <div>
-                        <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">PTW<span className="text-blue-600">Track</span></h1>
-                        <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Safety Operations</p>
-                    </div>
-                </div>
-
-                <nav className="flex-1 px-4 py-8 space-y-2">
-                    <Button variant="ghost" className="w-full justify-start gap-3 h-12 font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 hover:text-blue-700">
-                        <LayoutDashboard className="w-5 h-5" />
-                        {t.dashboard.title}
-                    </Button>
-                    <Button onClick={() => window.location.href = '/permits'} variant="ghost" className="w-full justify-start gap-3 h-12 font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900">
-                        <FileText className="w-5 h-5" />
-                        {t.permits.title}
-                    </Button>
-                    <Button onClick={() => window.location.href = '/contractors'} variant="ghost" className="w-full justify-start gap-3 h-12 font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900">
-                        <Users className="w-5 h-5" />
-                        {t.contractors.title}
-                    </Button>
-                    <Button onClick={() => window.location.href = '/locations'} variant="ghost" className="w-full justify-start gap-3 h-12 font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900">
-                        <MapPin className="w-5 h-5" />
-                        {t.locations.title}
-                    </Button>
-                    <Button onClick={() => window.location.href = '/analytics'} variant="ghost" className="w-full justify-start gap-3 h-12 font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900">
-                        <BarChart3 className="w-5 h-5" />
-                        {language === 'tr' ? 'Analitik' : 'Analytics'}
-                    </Button>
-                </nav>
-            </aside>
-
-            {/* Main Content */}
-            <main className="flex-1 min-w-0 pb-12">
-                {/* Header */}
-                <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-30 shadow-sm shadow-slate-100/50">
-                    <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                        {t.dashboard.subtitle}
-                        <div className="bg-green-500 w-2 h-2 rounded-full animate-pulse"></div>
-                    </h2>
-                    <div className="flex items-center gap-6">
-                        <Header />
-                    </div>
-                </header>
-
-                <div className="p-8 max-w-7xl mx-auto">
-                    {/* Stats Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-                        <Card className="border-0 shadow-sm bg-white overflow-hidden group">
-                            <CardContent className="p-6 relative">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-500"></div>
-                                <div className="relative">
-                                    <div className="bg-blue-100 w-12 h-12 rounded-xl flex items-center justify-center text-blue-600 mb-4 shadow-sm shadow-blue-100">
-                                        <FileText className="w-6 h-6" />
-                                    </div>
-                                    <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">{t.dashboard.totalPermits}</p>
-                                    <div className="flex items-end gap-2">
-                                        <p className="text-3xl font-black text-slate-900 leading-none">{stats?.totalPermits || 0}</p>
-                                        <Badge variant="outline" className="bg-blue-50 border-blue-100 text-blue-600 font-bold mb-0.5 whitespace-nowrap">
-                                            {t.dashboard.allTime}
-                                        </Badge>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card className="border-0 shadow-sm bg-white overflow-hidden group">
-                            <CardContent className="p-6 relative">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-500"></div>
-                                <div className="relative">
-                                    <div className="bg-green-100 w-12 h-12 rounded-xl flex items-center justify-center text-green-600 mb-4 shadow-sm shadow-green-100">
-                                        <Activity className="w-6 h-6" />
-                                    </div>
-                                    <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">{t.dashboard.activePermits}</p>
-                                    <div className="flex items-end gap-2">
-                                        <p className="text-3xl font-black text-slate-900 leading-none">{stats?.activePermits || 0}</p>
-                                        <Badge variant="outline" className="bg-green-50 border-green-100 text-green-600 font-bold mb-0.5 whitespace-nowrap">
-                                            {t.dashboard.currentlyActive}
-                                        </Badge>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card className="border-0 shadow-sm bg-white overflow-hidden group">
-                            <CardContent className="p-6 relative">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-50 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-500"></div>
-                                <div className="relative">
-                                    <div className="bg-amber-100 w-12 h-12 rounded-xl flex items-center justify-center text-amber-600 mb-4 shadow-sm shadow-amber-100">
-                                        <Clock className="w-6 h-6" />
-                                    </div>
-                                    <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">{t.dashboard.pendingApprovals}</p>
-                                    <div className="flex items-end gap-2">
-                                        <p className="text-3xl font-black text-slate-900 leading-none">{stats?.pendingApprovals || 0}</p>
-                                        <Badge variant="outline" className="bg-amber-50 border-amber-100 text-amber-600 font-bold mb-0.5 whitespace-nowrap">
-                                            {t.dashboard.awaitingApproval}
-                                        </Badge>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card className="border-0 shadow-sm bg-white overflow-hidden group">
-                            <CardContent className="p-6 relative">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-500"></div>
-                                <div className="relative">
-                                    <div className="bg-slate-100 w-12 h-12 rounded-xl flex items-center justify-center text-slate-600 mb-4 shadow-sm shadow-slate-100">
-                                        <CheckCircle2 className="w-6 h-6" />
-                                    </div>
-                                    <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">{t.dashboard.completedPermits}</p>
-                                    <div className="flex items-end gap-2">
-                                        <p className="text-3xl font-black text-slate-900 leading-none">{stats?.completedPermits || 0}</p>
-                                        <Badge variant="outline" className="bg-slate-50 border-slate-100 text-slate-600 font-bold mb-0.5 whitespace-nowrap">
-                                            {t.dashboard.successfullyCompleted}
-                                        </Badge>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Controls Bar */}
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8">
-                        <div className="flex-1">
-                            <div className="flex items-center justify-between gap-4 mb-4">
-                                <SearchAndFilter
-                                    filters={filters}
-                                    onFiltersChange={setFilters}
-                                    permits={permits}
-                                />
-                            </div>
+                {/* Sidebar (Desktop) */}
+                <aside className="hidden lg:flex w-72 bg-white border-r border-slate-200 flex-col sticky top-0 h-screen">
+                    <div className="p-8 pb-4 flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
+                            <FileText className="w-6 h-6" />
                         </div>
-                        <Button
-                            onClick={() => window.location.href = '/permits/new'}
-                            size="lg"
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 px-8 rounded-xl shadow-lg shadow-blue-200 flex items-center gap-3 transition-all active:scale-95"
-                        >
-                            <Plus className="w-5 h-5" />
-                            {t.dashboard.newPermit}
+                        <div>
+                            <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">PTW<span className="text-blue-600">Track</span></h1>
+                            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Safety Operations</p>
+                        </div>
+                    </div>
+
+                    <nav className="flex-1 px-4 py-8 space-y-2">
+                        <Button variant="ghost" className="w-full justify-start gap-3 h-12 font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 hover:text-blue-700">
+                            <LayoutDashboard className="w-5 h-5" />
+                            {t.dashboard.title}
                         </Button>
-                    </div>
+                        <Button onClick={() => window.location.href = '/permits'} variant="ghost" className="w-full justify-start gap-3 h-12 font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900">
+                            <FileText className="w-5 h-5" />
+                            {t.permits.title}
+                        </Button>
+                        {currentUser?.role === 'admin' && (
+                            <>
+                                <Button onClick={() => window.location.href = '/contractors'} variant="ghost" className="w-full justify-start gap-3 h-12 font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900">
+                                    <Users className="w-5 h-5" />
+                                    {t.contractors.title}
+                                </Button>
+                                <Button onClick={() => window.location.href = '/locations'} variant="ghost" className="w-full justify-start gap-3 h-12 font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900">
+                                    <MapPin className="w-5 h-5" />
+                                    {t.locations.title}
+                                </Button>
+                            </>
+                        )}
+                        {currentUser?.role === 'admin' && (
+                            <Button onClick={() => window.location.href = '/users'} variant="ghost" className="w-full justify-start gap-3 h-12 font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900">
+                                <Users className="w-5 h-5" />
+                                {language === 'tr' ? 'Kullanıcılar' : 'Users'}
+                            </Button>
+                        )}
+                        {(currentUser?.role === 'admin' || currentUser?.role === 'approver') && (
+                            <Button onClick={() => window.location.href = '/analytics'} variant="ghost" className="w-full justify-start gap-3 h-12 font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900">
+                                <BarChart3 className="w-5 h-5" />
+                                {language === 'tr' ? 'Analitik' : 'Analytics'}
+                            </Button>
+                        )}
+                    </nav>
+                </aside>
 
-                    {/* Content Tabs */}
-                    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                            <TabsList className="bg-white p-1 rounded-xl shadow-sm border border-slate-200 h-12 inline-flex">
-                                <TabsTrigger value="all" className="rounded-lg font-bold px-6 data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all">
-                                    {t.common.all} <span className="ml-1.5 opacity-60 font-medium">({counts.all})</span>
-                                </TabsTrigger>
-                                <TabsTrigger value="pending" className="rounded-lg font-bold px-6 data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all">
-                                    {t.statuses.pending} <span className="ml-1.5 opacity-60 font-medium">({counts.pending})</span>
-                                </TabsTrigger>
-                                <TabsTrigger value="active" className="rounded-lg font-bold px-6 data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all">
-                                    {t.statuses.active} <span className="ml-1.5 opacity-60 font-medium">({counts.active})</span>
-                                </TabsTrigger>
-                                <TabsTrigger value="completed" className="rounded-lg font-bold px-6 data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all">
-                                    {t.statuses.completed} <span className="ml-1.5 opacity-60 font-medium">({counts.completed})</span>
-                                </TabsTrigger>
-                            </TabsList>
+                {/* Main Content */}
+                <main className="flex-1 min-w-0 pb-12">
+                    {/* Header */}
+                    <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-30 shadow-sm shadow-slate-100/50">
+                        <div>
+                            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                {currentUser?.role === 'requester'
+                                    ? (language === 'tr' ? 'Gösterge Panelim' : 'My Dashboard')
+                                    : currentUser?.role === 'approver'
+                                        ? (language === 'tr' ? 'Onay Merkezi' : 'Approval Center')
+                                        : t.dashboard.subtitle
+                                }
+                                <div className="bg-green-500 w-2 h-2 rounded-full animate-pulse"></div>
+                            </h2>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none mt-1">
+                                {currentUser?.role === 'requester'
+                                    ? (language === 'tr' ? 'Kişisel iş izinleri' : 'Personal permits overview')
+                                    : currentUser?.role === 'approver'
+                                        ? (language === 'tr' ? 'Bekleyen onaylar ve aktif izinler' : 'Pending approvals and active permits')
+                                        : (language === 'tr' ? 'Sistem geneli görünüm' : 'System-wide overview')
+                                }
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-6">
+                            <Header />
+                        </div>
+                    </header>
 
-                            <div className="flex items-center gap-3">
-                                <div className="flex bg-white border border-slate-200 p-1 rounded-xl shadow-sm h-12 items-center">
-                                    <Button
-                                        variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-                                        size="sm"
-                                        onClick={() => setViewMode('list')}
-                                        className={`rounded-lg px-4 h-9 font-bold transition-all ${viewMode === 'list' ? 'bg-slate-100 text-blue-600' : 'text-slate-500'}`}
-                                    >
-                                        <List className="w-4 h-4 mr-2" />
-                                        List
-                                    </Button>
-                                    <Button
-                                        variant={viewMode === 'kanban' ? 'secondary' : 'ghost'}
-                                        size="sm"
-                                        onClick={() => setViewMode('kanban')}
-                                        className={`rounded-lg px-4 h-9 font-bold transition-all ${viewMode === 'kanban' ? 'bg-slate-100 text-blue-600' : 'text-slate-500'}`}
-                                    >
-                                        <LayoutGrid className="w-4 h-4 mr-2" />
-                                        Kanban
-                                    </Button>
-                                </div>
-                                <ExportMenu permits={filteredPermits} />
-                            </div>
+                    <div className="p-8 max-w-7xl mx-auto">
+                        {/* Stats Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+                            <Card className="border-0 shadow-sm bg-white overflow-hidden group">
+                                <CardContent className="p-6 relative">
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-500"></div>
+                                    <div className="relative">
+                                        <div className="bg-blue-100 w-12 h-12 rounded-xl flex items-center justify-center text-blue-600 mb-4 shadow-sm shadow-blue-100">
+                                            <FileText className="w-6 h-6" />
+                                        </div>
+                                        <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">
+                                            {currentUser?.role === 'requester'
+                                                ? (language === 'tr' ? 'Toplam İzinlerim' : 'My Total Permits')
+                                                : t.dashboard.totalPermits
+                                            }
+                                        </p>
+                                        <div className="flex items-end gap-2">
+                                            <p className="text-3xl font-black text-slate-900 leading-none">{stats?.totalPermits || 0}</p>
+                                            <Badge variant="outline" className="bg-blue-50 border-blue-100 text-blue-600 font-bold mb-0.5 whitespace-nowrap">
+                                                {currentUser?.role === 'requester'
+                                                    ? (language === 'tr' ? 'Oluşturduğum' : 'Created')
+                                                    : t.dashboard.allTime
+                                                }
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="border-0 shadow-sm bg-white overflow-hidden group">
+                                <CardContent className="p-6 relative">
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-500"></div>
+                                    <div className="relative">
+                                        <div className="bg-green-100 w-12 h-12 rounded-xl flex items-center justify-center text-green-600 mb-4 shadow-sm shadow-green-100">
+                                            <Activity className="w-6 h-6" />
+                                        </div>
+                                        <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">{t.dashboard.activePermits}</p>
+                                        <div className="flex items-end gap-2">
+                                            <p className="text-3xl font-black text-slate-900 leading-none">{stats?.activePermits || 0}</p>
+                                            <Badge variant="outline" className="bg-green-50 border-green-100 text-green-600 font-bold mb-0.5 whitespace-nowrap">
+                                                {t.dashboard.currentlyActive}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="border-0 shadow-sm bg-white overflow-hidden group">
+                                <CardContent className="p-6 relative">
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-50 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-500"></div>
+                                    <div className="relative">
+                                        <div className="bg-amber-100 w-12 h-12 rounded-xl flex items-center justify-center text-amber-600 mb-4 shadow-sm shadow-amber-100">
+                                            <Clock className="w-6 h-6" />
+                                        </div>
+                                        <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">{t.dashboard.pendingApprovals}</p>
+                                        <div className="flex items-end gap-2">
+                                            <p className="text-3xl font-black text-slate-900 leading-none">{stats?.pendingApprovals || 0}</p>
+                                            <Badge variant="outline" className="bg-amber-50 border-amber-100 text-amber-600 font-bold mb-0.5 whitespace-nowrap">
+                                                {t.dashboard.awaitingApproval}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="border-0 shadow-sm bg-white overflow-hidden group">
+                                <CardContent className="p-6 relative">
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-500"></div>
+                                    <div className="relative">
+                                        <div className="bg-slate-100 w-12 h-12 rounded-xl flex items-center justify-center text-slate-600 mb-4 shadow-sm shadow-slate-100">
+                                            <CheckCircle2 className="w-6 h-6" />
+                                        </div>
+                                        <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">{t.dashboard.completedPermits}</p>
+                                        <div className="flex items-end gap-2">
+                                            <p className="text-3xl font-black text-slate-900 leading-none">{stats?.completedPermits || 0}</p>
+                                            <Badge variant="outline" className="bg-slate-50 border-slate-100 text-slate-600 font-bold mb-0.5 whitespace-nowrap">
+                                                {t.dashboard.successfullyCompleted}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
                         </div>
 
-                        <TabsContent value={activeTab} className="mt-0 focus-visible:outline-none focus-visible:ring-0">
-                            {viewMode === 'list' ? (
-                                <PermitList
-                                    permits={filteredPermits}
-                                    onSelectPermit={(p) => window.location.href = `/permits/${p.id}`}
-                                    onUpdateStatus={handleUpdateStatus}
-                                />
-                            ) : (
-                                <KanbanBoard
-                                    permits={filteredPermits}
-                                    onSelectPermit={(p) => window.location.href = `/permits/${p.id}`}
-                                    onUpdateStatus={handleUpdateStatus}
-                                />
-                            )}
-                        </TabsContent>
-                    </Tabs>
-                </div>
-            </main>
-        </div>
+                        {/* Controls Bar */}
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8">
+                            <div className="flex-1">
+                                <div className="flex items-center justify-between gap-4 mb-4">
+                                    <SearchAndFilter
+                                        filters={filters}
+                                        onFiltersChange={setFilters}
+                                        permits={permits}
+                                    />
+                                </div>
+                            </div>
+                            <Button
+                                onClick={() => window.location.href = '/permits/new'}
+                                size="lg"
+                                className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 px-8 rounded-xl shadow-lg shadow-blue-200 flex items-center gap-3 transition-all active:scale-95"
+                            >
+                                <Plus className="w-5 h-5" />
+                                {t.dashboard.newPermit}
+                            </Button>
+                        </div>
+
+                        {/* Content Tabs */}
+                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                                <TabsList className="bg-white p-1 rounded-xl shadow-sm border border-slate-200 h-12 inline-flex">
+                                    <TabsTrigger value="all" className="rounded-lg font-bold px-6 data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all">
+                                        {t.common.all} <span className="ml-1.5 opacity-60 font-medium">({counts.all})</span>
+                                    </TabsTrigger>
+                                    {(currentUser?.role === 'admin' || currentUser?.role === 'approver') && (
+                                        <TabsTrigger value="pending" className="rounded-lg font-bold px-6 data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all">
+                                            {language === 'tr' ? 'Onay Bekleyenler' : 'Approvals'} <span className="ml-1.5 opacity-60 font-medium">({counts.approvals})</span>
+                                        </TabsTrigger>
+                                    )}
+                                    <TabsTrigger value="active" className="rounded-lg font-bold px-6 data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all">
+                                        {t.statuses.active} <span className="ml-1.5 opacity-60 font-medium">({counts.active})</span>
+                                    </TabsTrigger>
+                                    <TabsTrigger value="completed" className="rounded-lg font-bold px-6 data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all">
+                                        {t.statuses.completed} <span className="ml-1.5 opacity-60 font-medium">({counts.completed})</span>
+                                    </TabsTrigger>
+                                </TabsList>
+
+                                <div className="flex items-center gap-3">
+                                    <div className="flex bg-white border border-slate-200 p-1 rounded-xl shadow-sm h-12 items-center">
+                                        <Button
+                                            variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                                            size="sm"
+                                            onClick={() => setViewMode('list')}
+                                            className={`rounded-lg px-4 h-9 font-bold transition-all ${viewMode === 'list' ? 'bg-slate-100 text-blue-600' : 'text-slate-500'}`}
+                                        >
+                                            <List className="w-4 h-4 mr-2" />
+                                            List
+                                        </Button>
+                                        <Button
+                                            variant={viewMode === 'kanban' ? 'secondary' : 'ghost'}
+                                            size="sm"
+                                            onClick={() => setViewMode('kanban')}
+                                            className={`rounded-lg px-4 h-9 font-bold transition-all ${viewMode === 'kanban' ? 'bg-slate-100 text-blue-600' : 'text-slate-500'}`}
+                                        >
+                                            <LayoutGrid className="w-4 h-4 mr-2" />
+                                            Kanban
+                                        </Button>
+                                    </div>
+                                    <ExportMenu permits={filteredPermits} />
+                                </div>
+                            </div>
+
+                            <TabsContent value={activeTab} className="mt-0 focus-visible:outline-none focus-visible:ring-0">
+                                {viewMode === 'list' ? (
+                                    <PermitList
+                                        permits={filteredPermits}
+                                        onSelectPermit={(p) => window.location.href = `/permits/${p.id}`}
+                                        onUpdateStatus={handleUpdateStatus}
+                                    />
+                                ) : (
+                                    <KanbanBoard
+                                        permits={filteredPermits}
+                                        onSelectPermit={(p) => window.location.href = `/permits/${p.id}`}
+                                        onUpdateStatus={handleUpdateStatus}
+                                    />
+                                )}
+                            </TabsContent>
+                        </Tabs>
+                    </div>
+                </main>
+            </div>
+        </AuthGuard>
     );
 }
